@@ -1,241 +1,124 @@
 package org.carlspring.strongbox.dependency.snippet;
 
-import org.carlspring.strongbox.artifact.coordinates.MavenArtifactCoordinates;
-import org.carlspring.strongbox.config.Maven2LayoutProviderTestConfig;
-import org.carlspring.strongbox.domain.ArtifactEntry;
-import org.carlspring.strongbox.providers.ProviderImplementationException;
-import org.carlspring.strongbox.providers.layout.Maven2LayoutProvider;
-import org.carlspring.strongbox.providers.search.MavenIndexerSearchProvider;
-import org.carlspring.strongbox.repository.IndexedMavenRepositoryFeatures;
-import org.carlspring.strongbox.services.ArtifactEntryService;
-import org.carlspring.strongbox.storage.repository.MutableRepository;
-import org.carlspring.strongbox.storage.search.SearchRequest;
-import org.carlspring.strongbox.storage.search.SearchResult;
-import org.carlspring.strongbox.testing.TestCaseWithMavenArtifactGenerationAndIndexing;
-
-import javax.inject.Inject;
-import javax.xml.bind.JAXBException;
-import java.io.IOException;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.BeforeEach;
+import org.carlspring.strongbox.artifact.coordinates.PypiWheelArtifactCoordinates;
+import org.carlspring.strongbox.dependency.snippet.PypiWheelDependencyFormatter;
+import org.carlspring.strongbox.providers.layout.PypiLayoutProvider;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.parallel.Execution;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.ContextConfiguration;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.parallel.ExecutionMode.SAME_THREAD;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import java.util.*;
 
-/**
- * @author carlspring
- */
-@SpringBootTest
-@ActiveProfiles(profiles = "test")
-@ContextConfiguration(classes = Maven2LayoutProviderTestConfig.class)
-@Execution(SAME_THREAD)
-public class MavenDependencyFormatterTest
-        extends TestCaseWithMavenArtifactGenerationAndIndexing
+public class PypiWheelDependencyFormatterTest
 {
-
-    private static final String REPOSITORY_RELEASES = "mdft-releases";
-
-    public static final String REPOSITORY_BASEDIR = "target/strongbox-vault/storages/storage0/" + REPOSITORY_RELEASES;
-
-    @Inject
-    private CompatibleDependencyFormatRegistry compatibleDependencyFormatRegistry;
-
-    @Inject
-    private Optional<MavenIndexerSearchProvider> mavenIndexerSearchProvider;
-
-    @Inject
-    private ArtifactEntryService artifactEntryService;
-
-    @Inject
-    private SnippetGenerator snippetGenerator;
-
-    @BeforeEach
-    public void setUp()
-            throws Exception
-    {
-        // Because there is no smarter way to cleanup... :-|
-        removeEntriesIfAnyExist();
-
-        createRepositoryWithArtifacts(STORAGE0,
-                                      REPOSITORY_RELEASES,
-                                      true,
-                                      "org.carlspring.strongbox:maven-snippet",
-                                      "1.0");
-
-        generateArtifact(REPOSITORY_BASEDIR, "org.carlspring.strongbox:maven-snippet:1.0:jar:sources");
-
-        reIndex(STORAGE0, REPOSITORY_RELEASES, "org/carlspring/strongbox");
-    }
-
-    @AfterEach
-    public void removeRepositories()
-            throws IOException, JAXBException
-    {
-        removeRepositories(getRepositories());
-    }
-
-    private void removeEntriesIfAnyExist()
-    {
-        removeEntryIfExists(new MavenArtifactCoordinates("org.carlspring.strongbox",
-                                                         "maven-snippet",
-                                                         "1.0",
-                                                         null,
-                                                         "jar"));
-        removeEntryIfExists(new MavenArtifactCoordinates("org.carlspring.strongbox",
-                                                         "maven-snippet",
-                                                         "1.0",
-                                                         "sources",
-                                                         "jar"));
-    }
-
-    private void removeEntryIfExists(MavenArtifactCoordinates coordinates1)
-    {
-        ArtifactEntry artifactEntry = artifactEntryService.findOneArtifact(STORAGE0,
-                                                                           REPOSITORY_RELEASES,
-                                                                           coordinates1.toPath());
-
-        if (artifactEntry != null)
-        {
-            artifactEntryService.delete(artifactEntry);
-        }
-    }
-
-    private Set<MutableRepository> getRepositories()
-    {
-        Set<MutableRepository> repositories = new LinkedHashSet<>();
-        repositories.add(createRepositoryMock(STORAGE0, REPOSITORY_RELEASES, Maven2LayoutProvider.ALIAS));
-
-        return repositories;
-    }
-
-    @Test
-    public void testMavenDependencyGeneration()
-            throws ProviderImplementationException
-    {
-        DependencySynonymFormatter formatter = compatibleDependencyFormatRegistry.getProviderImplementation(Maven2LayoutProvider.ALIAS,
-                                                                                                            Maven2LayoutProvider.ALIAS);
+  private ArrayList<String> wheelartifactcoordinates = new ArrayList<String>();
+  private ArrayList<String> formattedwheels = new ArrayList<String>();
+  public PypiWheelDependencyFormatterTest()
+  {
+        @Inject
+        private CompatibleDependencyFormatRegistry compatibleDependencyFormatRegistry;
+        
+        DependencySynonymFormatter formatter = compatibleDependencyFormatRegistry.getProviderImplementation(PypiLayoutProvider.ALIAS,
+                                                                                                        PypiLayoutProvider.ALIAS);
         assertNotNull(formatter, "Failed to look up dependency synonym formatter!");
+        PypiWheelArtifactCoordinates coordinates;
+        // fake examples
 
-        MavenArtifactCoordinates coordinates = new MavenArtifactCoordinates();
-        coordinates.setGroupId("org.carlspring.strongbox");
-        coordinates.setArtifactId("maven-snippet");
-        coordinates.setVersion("1.0");
-        coordinates.setExtension("jar");
+        coordinates = PypiWheelArtifactCoordinates.parse("distribution-1.0-1-py27-none-any.whl");
+        wheelartifactcoordinates.add(formatter.getDependencySnippet(coordinates));
 
-        String snippet = formatter.getDependencySnippet(coordinates);
+        coordinates = PypiWheelArtifactCoordinates.parse("example_pkg_your_username-1.5.0-py3-none-any.whl");
+        wheelartifactcoordinates.add(formatter.getDependencySnippet(coordinates));
 
-        System.out.println(snippet);
+        coordinates = PypiWheelArtifactCoordinates.parse("someproject-1.5.0-py2-py3-none.whl");
+        wheelartifactcoordinates.add(formatter.getDependencySnippet(coordinates));
 
-        assertEquals("<dependency>\n" +
-                     "    <groupId>org.carlspring.strongbox</groupId>\n" +
-                     "    <artifactId>maven-snippet</artifactId>\n" +
-                     "    <version>1.0</version>\n" +
-                     "    <type>jar</type>\n" +
-                     "    <scope>compile</scope>\n" +
-                     "</dependency>\n",
-                     snippet,
-                     "Failed to generate dependency!");
-    }
+        // six
+        coordinates = PypiWheelArtifactCoordinates.parse("six-1.12.0-py2.py3-none-any.whl");
+        wheelartifactcoordinates.add(formatter.getDependencySnippet(coordinates));
 
-    @Test
-    public void testMavenDependencyGenerationWithClassifier()
-            throws ProviderImplementationException
-    {
-        DependencySynonymFormatter formatter = compatibleDependencyFormatRegistry.getProviderImplementation(Maven2LayoutProvider.ALIAS,
-                                                                                                            Maven2LayoutProvider.ALIAS);
-        assertNotNull(formatter, "Failed to look up dependency synonym formatter!");
+        // futures
+        coordinates = PypiWheelArtifactCoordinates.parse("futures-3.2.0-py2-none-any.whl");
+        wheelartifactcoordinates.add(formatter.getDependencySnippet(coordinates));
+        // pytz
+        coordinates = PypiWheelArtifactCoordinates.parse("pytz-2018.9-3-py2.py3-none-any.whl");
+        wheelartifactcoordinates.add(formatter.getDependencySnippet(coordinates));
+        // numpy
+        coordinates = PypiWheelArtifactCoordinates.parse("numpy-1.16.2-cp27-cp27m-macosx_10_6_intel.macosx_10_9_intel.macosx_10_9_x86_64.macosx_10_10_intel.macosx_10_10_x86_64.whl");
+        wheelartifactcoordinates.add(formatter.getDependencySnippet(coordinates));
 
-        MavenArtifactCoordinates coordinates = new MavenArtifactCoordinates();
-        coordinates.setGroupId("org.carlspring.strongbox");
-        coordinates.setArtifactId("maven-snippet");
-        coordinates.setVersion("2.0");
-        coordinates.setClassifier("sources");
+        // cryptography
+        coordinates = PypiWheelArtifactCoordinates.parse("cryptography-2.6.1-cp27-cp27m-macosx_10_6_intel.whl");
+        wheelartifactcoordinates.add(formatter.getDependencySnippet(coordinates));
 
-        String snippet = formatter.getDependencySnippet(coordinates);
+        coordinates = PypiWheelArtifactCoordinates.parse("cryptography-2.6.1-0-cp27-cp27mu-manylinux1_x86_64.whl");
+        wheelartifactcoordinates.add(formatter.getDependencySnippet(coordinates));
 
-        System.out.println(snippet);
+        // protobuf
+        coordinates = PypiWheelArtifactCoordinates.parse("protobuf-3.7.1-cp27-cp27m-macosx_10_9_intel.macosx_10_9_x86_64.macosx_10_10_intel.macosx_10_10_x86_64.whl");
+        wheelartifactcoordinates.add(formatter.getDependencySnippet(coordinates));
 
-        assertEquals("<dependency>\n" +
-                     "    <groupId>org.carlspring.strongbox</groupId>\n" +
-                     "    <artifactId>maven-snippet</artifactId>\n" +
-                     "    <version>2.0</version>\n" +
-                     "    <type>jar</type>\n" +
-                     "    <classifier>sources</classifier>\n" +
-                     "    <scope>compile</scope>\n" +
-                     "</dependency>\n",
-                     snippet,
-                     "Failed to generate dependency!");
-    }
+        // virtualenv
+        coordinates = PypiWheelArtifactCoordinates.parse("virtualenv-16.4.3-py2.py3-none-any.whl");
+        wheelartifactcoordinates.add(formatter.getDependencySnippet(coordinates));
 
-    @Test
-    public void testSearchExactWithDependencySnippet()
-    {
-        Assumptions.assumeTrue(mavenIndexerSearchProvider.isPresent());
+        // coverage
+        coordinates = PypiWheelArtifactCoordinates.parse("coverage-4.5.3-cp26-cp26m-macosx_10_12_x86_64.whl");
+        wheelartifactcoordinates.add(formatter.getDependencySnippet(coordinates));
 
-        IndexedMavenRepositoryFeatures features = (IndexedMavenRepositoryFeatures) getFeatures();
-        final int x = features.reIndex(STORAGE0,
-                                       REPOSITORY_RELEASES,
-                                       "org/carlspring/strongbox/maven-snippet");
+        // docker
+        coordinates = PypiWheelArtifactCoordinates.parse("docker-3.7.2-py2.py3-none-any.whl");
+        wheelartifactcoordinates.add(formatter.getDependencySnippet(coordinates));
 
-        assertTrue(x >= 3, "Incorrect number of artifacts found!");
+        // bcrypt
+        coordinates = PypiWheelArtifactCoordinates.parse("bcrypt-3.1.6-cp27-cp27m-macosx_10_6_intel.whl");
+        wheelartifactcoordinates.add(formatter.getDependencySnippet(coordinates));
 
-        SearchRequest request = new SearchRequest(STORAGE0,
-                                                  REPOSITORY_RELEASES,
-                                                  new MavenArtifactCoordinates("org.carlspring.strongbox",
-                                                                               "maven-snippet",
-                                                                               "1.0",
-                                                                               null,
-                                                                               "jar"),
-                                                  MavenIndexerSearchProvider.ALIAS);
+        coordinates = PypiWheelArtifactCoordinates.parse("bcrypt-3.1.6-cp34-cp34m-manylinux1_i686.whl");
+        wheelartifactcoordinates.add(formatter.getDependencySnippet(coordinates));
 
-        SearchResult searchResult = mavenIndexerSearchProvider.get().findExact(request);
 
-        assertNotNull(searchResult);
-        assertFalse(searchResult.getSnippets().isEmpty());
+        // We are now populating formattedwheels with manually pre-parsed coordinate arrays
+        //fake examples
+        formattedwheels.add("distribution == 1.0");
+        formattedwheels.add("example_pkg_your_username == 1.5.0");
+        formattedwheels.add("someproject == 1.5.0");
 
-        for (CodeSnippet codeSnippet : searchResult.getSnippets())
+        //six
+        formattedwheels.add("six == 1.12.0");
+
+        //futures
+        formattedwheels.add("futures == 3.2.0");
+
+        //pytz
+        formattedwheels.add("pytz == 2018.9");
+
+        //numpy
+        formattedwheels.add("numpy == 1.16.2");
+
+        //cryptography
+        formattedwheels.add("cryptography == 2.6.1");
+        formattedwheels.add("cryptography == 2.6.1");
+
+        //protobuf
+        formattedwheels.add("protobuf == 3.7.1");
+
+        //virtualenv
+        formattedwheels.add("virtualenv == 16.4.3");
+
+        //coverage
+        formattedwheels.add("coverage == 4.5.3");
+
+        //docker
+        formattedwheels.add("docker == 3.7.2");
+
+        //bcyrpt
+        formattedwheels.add("bcrypt == 3.1.6");
+        formattedwheels.add("bcrypt == 3.1.6");
+
+        for (int i = 0; i < formattedwheels.size(); ++i)
         {
-            System.out.println("Dependency snippet for " + codeSnippet.name + ":");
-            System.out.println("------------------------------------------------------");
-            System.out.println(codeSnippet.code);
+          assertEquals(wheelartifactcoordinates[i] == formattedwheels[i]);
         }
-    }
 
-    @Test
-    public void testRegisteredSynonyms()
-    {
-        List<CodeSnippet> codeSnippets = snippetGenerator.generateSnippets(Maven2LayoutProvider.ALIAS,
-                                                                           new MavenArtifactCoordinates("org.carlspring.strongbox",
-                                                                                                        "maven-snippet",
-                                                                                                        "1.0",
-                                                                                                        null,
-                                                                                                        "jar"));
-
-        assertNotNull(codeSnippets, "Failed to look up dependency synonym formatter!");
-        assertFalse(codeSnippets.isEmpty(), "No synonyms found!");
-        assertEquals(5, codeSnippets.size(), "Incorrect number of dependency synonyms!");
-
-        String[] synonyms = new String[]{ "Maven 2", "Gradle", "Ivy", "Leiningen", "SBT" };
-
-        int i = 0;
-        for (CodeSnippet snippet : codeSnippets)
-        {
-            System.out.println(snippet.getName());
-
-            assertEquals(synonyms[i], snippet.getName(), "Failed to re-order correctly!");
-
-            i++;
-        }
-    }
-
+  }
 }
